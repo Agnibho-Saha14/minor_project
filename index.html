@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SimpleBounce</title>
+  <style>
+    body {
+      margin: 0;
+      background: #f8fafc;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      overflow: hidden;
+    }
+
+    .ui-container {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 1.5rem 2.5rem;
+      border-radius: 20px;
+      box-shadow: 0 4px 15px rgba(148, 163, 184, 0.15);
+      backdrop-filter: blur(8px);
+    }
+
+    #score {
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: #0f172a;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    #controls {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 1.5rem 2rem;
+      border-radius: 20px;
+      color: #475569;
+      box-shadow: 0 4px 15px rgba(148, 163, 184, 0.15);
+      backdrop-filter: blur(8px);
+    }
+
+    .key {
+      display: inline-block;
+      padding: 0.5rem 1rem;
+      background: #f1f5f9;
+      border-radius: 12px;
+      border: 2px solid #e2e8f0;
+      margin: 0.3rem;
+      min-width: 20px;
+      text-align: center;
+      color: #0f172a;
+      font-weight: 600;
+      box-shadow: 0 2px 4px rgba(148, 163, 184, 0.1);
+      transition: all 0.2s ease;
+    }
+
+    .key:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 6px rgba(148, 163, 184, 0.15);
+    }
+
+    #game-over {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 255, 255, 0.98);
+      border: 3px solid #e2e8f0;
+      color: #0f172a;
+      text-align: center;
+      z-index: 1000;
+      display: none;
+      padding: 3rem 4rem;
+      border-radius: 24px;
+      box-shadow: 0 8px 30px rgba(148, 163, 184, 0.2);
+      backdrop-filter: blur(12px);
+    }
+
+    #game-over h1 {
+      font-size: 4.5rem;
+      margin: 0;
+      color: #0f172a;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    #game-over .final-score {
+      font-size: 2.25rem;
+      margin: 1.5rem 0;
+      color: #475569;
+    }
+
+    #game-over .restart-text {
+      font-size: 1.5rem;
+      margin-top: 1.5rem;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+  <div class="ui-container">
+    <div id="score">Score - 0</div>
+  </div>
+
+  <div id="controls">
+    <div>Move: <span class="key">W</span> <span class="key">A</span> <span class="key">S</span> <span class="key">D</span></div>
+    <div>Jump: <span class="key">SPACE</span></div>
+  </div>
+
+  <div id="game-over">
+    <h1>GAME OVER</h1>
+    <div class="final-score">Score - <span id="final-score">0</span></div>
+    <div class="restart-text">Press <span class="key">R</span> to restart</div>
+  </div>
+
+  <audio id="gameAudio" loop>
+    <source src="abc.mp3" type="audio/mp3">
+  </audio>
+
+  <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.150.1/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.150.1/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    let isGameOver = false;
+    let frames = 0;
+    let spawnRate = 200;
+    let score = 0;
+    let isJumping = false;
+    const enemies = [];
+    const JUMP_HEIGHT = 0.08;
+    const MAX_JUMP_TIME = 30;
+    const MAX_HEIGHT = 2; // Maximum height limit
+    let jumpTimer = 0;
+
+    const gameAudio = document.getElementById('gameAudio');
+    gameAudio.volume = 0.5;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf8fafc);
+
+    const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(6, 4, 10);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    class GameObject extends THREE.Mesh {
+      constructor({
+        width = 1,
+        height = 1,
+        depth = 1,
+        radius = 0.5,
+        color = '#666666',
+        velocity = { x: 0, y: 0, z: 0 },
+        position = { x: 0, y: 0, z: 0 },
+        zAcceleration = false,
+        isSphere = false
+      }) {
+        const geometry = isSphere 
+          ? new THREE.SphereGeometry(radius, 32, 32)
+          : new THREE.BoxGeometry(width, height, depth);
+        
+        const material = new THREE.MeshStandardMaterial({ 
+          color,
+          metalness: 0.3,
+          roughness: 0.7
+        });
+        
+        super(geometry, material);
+
+        this.width = isSphere ? radius * 2 : width;
+        this.height = isSphere ? radius * 2 : height;
+        this.depth = isSphere ? radius * 2 : depth;
+        this.isSphere = isSphere;
+
+        this.position.set(position.x, position.y, position.z);
+        this.updateSides();
+        this.velocity = velocity;
+        this.gravity = -0.002;
+        this.zAcceleration = zAcceleration;
+      }
+
+      updateSides() {
+        this.right = this.position.x + this.width / 2;
+        this.left = this.position.x - this.width / 2;
+        this.bottom = this.position.y - this.height / 2;
+        this.top = this.position.y + this.height / 2;
+        this.front = this.position.z + this.depth / 2;
+        this.back = this.position.z - this.depth / 2;
+      }
+
+      update(ground) {
+        this.updateSides();
+
+        if (this.zAcceleration) this.velocity.z += 0.0003;
+
+        // Handle height limit for player
+        if (this === player) {
+          if (this.position.y >= MAX_HEIGHT && this.velocity.y > 0) {
+            this.velocity.y = 0;
+            this.position.y = MAX_HEIGHT;
+          }
+        }
+
+        this.position.x += this.velocity.x;
+        this.position.z += this.velocity.z;
+        this.position.y += this.velocity.y;
+
+        this.applyGravity(ground);
+        
+        if (this.isSphere) {
+          this.rotation.x += this.velocity.z * 0.5;
+          this.rotation.z -= this.velocity.x * 0.5;
+        }
+
+        if (this.position.y < ground.position.y - 5) {
+          return true;
+        }
+        return false;
+      }
+
+      applyGravity(ground) {
+        this.velocity.y += this.gravity;
+
+        if (boxCollision({ box1: this, box2: ground })) {
+          const friction = 0.5;
+          this.velocity.y *= friction;
+          this.velocity.y = -this.velocity.y;
+          isJumping = false;
+          jumpTimer = 0;
+        }
+      }
+    }
+
+    function boxCollision({ box1, box2 }) {
+      const xCollision = box1.right >= box2.left && box1.left <= box2.right;
+      const yCollision = box1.bottom + box1.velocity.y <= box2.top && box1.top >= box2.bottom;
+      const zCollision = box1.front >= box2.back && box1.back <= box2.front;
+      return xCollision && yCollision && zCollision;
+    }
+
+    function endGame() {
+      isGameOver = true;
+      document.getElementById('game-over').style.display = 'block';
+      document.getElementById('final-score').textContent = score;
+      gameAudio.pause();
+      gameAudio.currentTime = 0;
+    }
+
+    const player = new GameObject({
+      radius: 0.5,
+      color: '#4a90e2',
+      velocity: { x: 0, y: -0.01, z: 0 },
+      isSphere: true
+    });
+    player.castShadow = true;
+    scene.add(player);
+
+    const ground = new GameObject({
+      width: 12,
+      height: 0.5,
+      depth: 60,
+      color: '#e2e8f0',
+      position: { x: 0, y: -2, z: 0 }
+    });
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const gridHelper = new THREE.GridHelper(100, 100, 0xe2e8f0, 0xf1f5f9);
+    gridHelper.position.y = -1.99;
+    scene.add(gridHelper);
+
+    const light = new THREE.DirectionalLight(0xffffff, 0.9);
+    light.position.set(5, 5, 2);
+    light.castShadow = true;
+    scene.add(light);
+
+    const ambientLight = new THREE.AmbientLight(0xf8fafc, 0.6);
+    scene.add(ambientLight);
+
+    const keys = {
+      a: { pressed: false },
+      d: { pressed: false },
+      s: { pressed: false },
+      w: { pressed: false },
+      space: { pressed: false }
+    };
+
+    window.addEventListener('keydown', (event) => {
+      if (!isGameOver && !gameAudio.playing) {
+        gameAudio.play().catch(e => console.log("Audio play failed:", e));
+      }
+
+      switch (event.code) {
+        case 'KeyA':
+          keys.a.pressed = true;
+          break;
+        case 'KeyD':
+          keys.d.pressed = true;
+          break;
+        case 'KeyS':
+          keys.s.pressed = true;
+          break;
+        case 'KeyW':
+          keys.w.pressed = true;
+          break;
+        case 'Space':
+          keys.space.pressed = true;
+          if (!isJumping && !isGameOver && player.position.y < MAX_HEIGHT) {
+            isJumping = true;
+            player.velocity.y = JUMP_HEIGHT;
+            jumpTimer = 0;
+          }
+          break;
+        case 'KeyR':
+          if (isGameOver) {
+            restartGame();
+          }
+          break;
+      }
+    });
+
+    window.addEventListener('keyup', (event) => {
+      switch (event.code) {
+        case 'KeyA':
+          keys.a.pressed = false;
+          break;
+        case 'KeyD':
+          keys.d.pressed = false;
+          break;
+        case 'KeyS':
+          keys.s.pressed = false;
+          break;
+        case 'KeyW':
+          keys.w.pressed = false;
+          break;
+        case 'Space':
+          keys.space.pressed = false;
+          break;
+      }
+    });
+
+    function restartGame() {
+      isGameOver = false;
+      frames = 0;
+      spawnRate = 200;
+      score = 0;
+      isJumping = false;
+      jumpTimer = 0;
+      
+      document.getElementById('game-over').style.display = 'none';
+      document.getElementById('score').textContent = 'Score - 0';
+      
+      player.position.set(0, 0, 0);
+      player.velocity.x = 0;
+      player.velocity.y = -0.01;
+      player.velocity.z = 0;
+      
+      // Remove all enemies
+      for (let enemy of enemies) {
+        scene.remove(enemy);
+      }
+      enemies.length = 0;
+      
+      gameAudio.currentTime = 0;
+      gameAudio.play().catch(e => console.log("Audio play failed:", e));
+      
+      animate();
+    }
+
+    function animate() {
+      const animationId = requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+      controls.update();
+
+      if (isGameOver) return;
+
+      // Score update
+      if (frames % 3 === 0) {
+        score += 1;
+        document.getElementById('score').textContent = `Score - ${score}`;
+      }
+
+      // Player movement with height limit
+      player.velocity.x = 0;
+      player.velocity.z = 0;
+      
+      if (keys.a.pressed) player.velocity.x = -0.05;
+      else if (keys.d.pressed) player.velocity.x = 0.05;
+      
+      if (keys.s.pressed) player.velocity.z = 0.05;
+      else if (keys.w.pressed && player.position.y < MAX_HEIGHT) {
+        player.velocity.z = -0.05;
+        player.velocity.y = 0.05;
+      }
+      // Jump timer logic
+      if (isJumping) {
+        jumpTimer++;
+        if (jumpTimer >= MAX_JUMP_TIME || player.position.y >= MAX_HEIGHT) {
+          isJumping = false;
+          jumpTimer = 0;
+        }
+      }
+
+      // Check for game over
+      if (player.update(ground)) {
+        cancelAnimationFrame(animationId);
+        endGame();
+        return;
+      }
+      
+      // Update and check enemies
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        const enemy = enemies[i];
+        enemy.update(ground);
+        
+        // Check collision with player
+        if (boxCollision({ box1: player, box2: enemy })) {
+          cancelAnimationFrame(animationId);
+          endGame();
+          return;
+        }
+        
+        // Remove enemies that have gone too far
+        if (enemy.position.z > 20) {
+          scene.remove(enemy);
+          enemies.splice(i, 1);
+        }
+      }
+
+      // Spawn new enemies
+      if (frames % spawnRate === 0) {
+        if (spawnRate > 20) spawnRate -= 10;
+
+        const colors = ['#ff6b6b', '#4a90e2', '#50c878', '#ffd700', '#ba68c8'];
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        const speed = 0.005 + (score / 10000);
+
+        const enemy = new GameObject({
+          width: 1,
+          height: 1,
+          depth: 1,
+          position: {
+            x: (Math.random() - 0.5) * 10,
+            y: 0,
+            z: -20
+          },
+          velocity: {
+            x: 0,
+            y: 0,
+            z: speed
+          },
+          color: randomColor,
+          zAcceleration: true
+        });
+
+        enemy.castShadow = true;
+        scene.add(enemy);
+        enemies.push(enemy);
+      }
+
+      frames++;
+    }
+
+    animate();
+
+    // Handle click for audio autoplay
+    document.addEventListener('click', () => {
+      if (!isGameOver && !gameAudio.playing) {
+        gameAudio.play().catch(e => console.log("Audio play failed:", e));
+      }
+    });
+  </script>
+</body>
+</html>
