@@ -120,7 +120,7 @@
   
 
   <audio id="gameOverAudio">
-    <source src="game-over.mp3" type="audio/mp3">
+    <source src="game-over-31-179699.mp3" type="audio/mp3">
   </audio>
 
   <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
@@ -142,6 +142,7 @@
     let spawnRate = 200;
     let score = 0;
     let isJumping = false;
+    let canJump = true; // New flag to track if player can jump again
     const enemies = [];
     const JUMP_HEIGHT = 0.08;
     const MAX_JUMP_TIME = 30;
@@ -230,6 +231,12 @@
             this.velocity.y = 0;
             this.position.y = MAX_HEIGHT;
           }
+          
+          // Start descent after reaching jump peak
+          if (isJumping && jumpTimer >= MAX_JUMP_TIME) {
+            this.velocity.y = -0.01; // Start descending
+            isJumping = false;
+          }
         }
 
         this.position.x += this.velocity.x;
@@ -258,6 +265,11 @@
           this.velocity.y = -this.velocity.y;
           isJumping = false;
           jumpTimer = 0;
+          
+          // Reset ability to jump when touching the ground
+          if (this === player) {
+            canJump = true;
+          }
         }
       }
     }
@@ -333,11 +345,12 @@
           keys.d.pressed = true;
           break;
         
-        
         case 'Space':
           keys.space.pressed = true;
-          if (!isJumping && !isGameOver && player.position.y < MAX_HEIGHT) {
+          // Only allow jump if canJump is true (haven't jumped yet or have touched ground since last jump)
+          if (canJump && !isGameOver && player.position.y < MAX_HEIGHT) {
             isJumping = true;
+            canJump = false; // Prevent jumping again until touching ground
             player.velocity.y = JUMP_HEIGHT;
             jumpTimer = 0;
           }
@@ -361,6 +374,14 @@
         
         case 'Space':
           keys.space.pressed = false;
+          // Force jump to end when space is released
+          if (isJumping) {
+            isJumping = false;
+            // Apply slight downward velocity to start descent
+            if (player.velocity.y > 0) {
+              player.velocity.y = -0.01;
+            }
+          }
           break;
       }
     });
@@ -371,6 +392,7 @@
       spawnRate = 200;
       score = 0;
       isJumping = false;
+      canJump = true;
       jumpTimer = 0;
       
       document.getElementById('game-over').style.display = 'none';
@@ -415,7 +437,6 @@
       if (keys.s.pressed) player.velocity.z = 0.05;
       else if (keys.w.pressed) {
         player.velocity.z = -0.05;
-        // Removed the velocity.y increase here to prevent jumping when pressing W
       }
 
       // Update camera position to follow behind the player
@@ -423,12 +444,14 @@
       camera.position.z = player.position.z + 5;
       camera.lookAt(player.position.x, player.position.y, player.position.z - 5);
       
-      // Jump timer logic
+      // Jump timer logic - only increment if still jumping
       if (isJumping) {
         jumpTimer++;
+        // Force jump to end after MAX_JUMP_TIME
         if (jumpTimer >= MAX_JUMP_TIME || player.position.y >= MAX_HEIGHT) {
           isJumping = false;
-          jumpTimer = 0;
+          // Apply slight downward velocity to start descent
+          player.velocity.y = -0.01;
         }
       }
 
