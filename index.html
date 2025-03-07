@@ -104,8 +104,8 @@
   </div>
 
   <div id="controls">
-    <div>Move:  <span class="key">A</span> <span class="key">S</span> <span class="key">D</span></div>
-    <div>Jump: <span class="key">SPACE</span>/<span class="key">W</span></div>
+    <div>Move: <span class="key">W</span>(Forward) <span class="key">A</span>(Left) <span class="key">D</span>(Right)</div>
+    <div>Jump: <span class="key">SPACE</span></div>
   </div>
 
   <div id="game-over">
@@ -332,9 +332,7 @@
         case 'KeyD':
           keys.d.pressed = true;
           break;
-        case 'KeyS':
-          keys.s.pressed = true;
-          break;
+        
         case 'KeyW':
           keys.w.pressed = true;
           break;
@@ -422,9 +420,9 @@
       else if (keys.d.pressed) player.velocity.x = 0.05;
       
       if (keys.s.pressed) player.velocity.z = 0.05;
-      else if (keys.w.pressed && player.position.y < MAX_HEIGHT) {
+      else if (keys.w.pressed) {
         player.velocity.z = -0.05;
-        player.velocity.y = 0.05;
+        // Removed the velocity.y increase here to prevent jumping when pressing W
       }
 
       // Update camera position to follow behind the player
