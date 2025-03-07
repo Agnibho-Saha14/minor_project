@@ -104,7 +104,7 @@
   </div>
 
   <div id="controls">
-    <div>Move: <span class="key">W</span>(Forward) <span class="key">A</span>(Left) <span class="key">D</span>(Right)</div>
+    <div>Move: <span class="key">A</span>(Left) <span class="key">D</span>(Right)</div>
     <div>Jump: <span class="key">SPACE</span></div>
   </div>
 
@@ -333,9 +333,7 @@
           keys.d.pressed = true;
           break;
         
-        case 'KeyW':
-          keys.w.pressed = true;
-          break;
+        
         case 'Space':
           keys.space.pressed = true;
           if (!isJumping && !isGameOver && player.position.y < MAX_HEIGHT) {
@@ -360,12 +358,7 @@
         case 'KeyD':
           keys.d.pressed = false;
           break;
-        case 'KeyS':
-          keys.s.pressed = false;
-          break;
-        case 'KeyW':
-          keys.w.pressed = false;
-          break;
+        
         case 'Space':
           keys.space.pressed = false;
           break;
