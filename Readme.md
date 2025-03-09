@@ -27,11 +27,8 @@ A thrilling 3D endless runner game built with Three.js where players must surviv
 - Game over screen with restart functionality
 
 ## Controls 🎮
-
-- **S**: Move backward
 - **A**: Move left
 - **D**: Move right
-- **SPACE**: Jump
 - **R**: Restart game (when game over)
 
 ## Technical Features 💻
