@@ -122,39 +122,89 @@
     #start-overlay h2 {
       font-size: 1.5rem;
       color: #475569;
-      margin: 10px 0 0 0; }
+      margin: 10px 0 0 0; 
+    }
+    
+    .player-info {
+      margin-top: 5px;
+      padding: 5px;
+      border-radius: 8px;
+    }
+    
+    #player1-info {
+      color: #4a90e2;
+      font-weight: bold;
+    }
+    
+    #player2-info {
+      color: #ff6b6b;
+      font-weight: bold;
+    }
+
+    /* Audio controls */
+    #audio-controls {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 0.8rem 1.2rem;
+      border-radius: 20px;
+      box-shadow: 0 4px 15px rgba(148, 163, 184, 0.15);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+    }
+
+    #audio-toggle {
+      cursor: pointer;
+      padding: 0.5rem 1rem;
+      background: #f1f5f9;
+      border-radius: 12px;
+      border: 2px solid #e2e8f0;
+      color: #0f172a;
+      font-weight: 600;
+      box-shadow: 0 2px 4px rgba(148, 163, 184, 0.1);
+      transition: all 0.2s ease;
+    }
+
+    #audio-toggle:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 6px rgba(148, 163, 184, 0.15);
+    }
   </style>
-  </head>
-  <body>
+</head>
+<body>
   <div id="start-overlay">
     <h1>SURVIVOR SPRINT 🎮</h1>
-    
-    <h2>Press Any Key to Start</h2>
+    <h2>Avoid Obstacles or Make Your Opponent Hit Them!</h2>
+    <div style="margin-top: 20px; color: #475569; font-size: 1.2rem;">
+      <p><strong>Player 1 (Blue):</strong> A/D to move</p>
+      <p><strong>Player 2 (Red):</strong> ←/→ to move</p>
+    </div>
+    <h2 style="margin-top: 30px;">Press Any Key to Start</h2>
   </div>
 
   <div class="ui-container">
-    <div id="score">Score - 0</div>
+    <div id="score">Survivor Time: 0</div>
+    <div class="player-info" id="player1-info">Player 1 (Blue): A/D</div>
+    <div class="player-info" id="player2-info">Player 2 (Red): ←/→</div>
   </div>
 
   <div id="controls">
-    <div>Move: <span class="key">A</span>(Left) <span class="key">D</span>(Right)</div>
-    <div>Jump: <span class="key">SPACE</span></div>
+    <div><span style="color: #4a90e2; font-weight: bold;">Player 1:</span> <span class="key">A</span><span class="key">D</span></div>
+    <div><span style="color: #ff6b6b; font-weight: bold;">Player 2:</span> <span class="key">←</span><span class="key">→</span></div>
+  </div>
+
+  <div id="audio-controls">
+    <div id="audio-toggle">🔊 Sound: ON</div>
   </div>
 
   <div id="game-over">
-    <h1>GAME OVER</h1>
-    <div class="final-score">Score - <span id="final-score">0</span></div>
+    <h1 id="winner-text">PLAYER 1 WINS!</h1>
+    <div class="final-score">Survival Time: <span id="final-score">0</span> seconds</div>
     <div class="restart-text">Press <span class="key">R</span> to restart</div>
   </div>
-
-  <audio id="gameAudio" loop>
-    <source src="abc.mp3" type="audio/mp3">
-  </audio>
-  
-
-  <audio id="gameOverAudio">
-    <source src="game-over.mp3" type="audio/mp3">
-  </audio>
 
   <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
 
@@ -172,29 +222,40 @@
 
     let isGameOver = false;
     let frames = 0;
-    let spawnRate = 200;
-    let score = 0;
-    let isJumping = false;
-    let canJump = true; // New flag to track if player can jump again
+    let spawnRate = 150;
+    let survivalTime = 0;
     const enemies = [];
-    const JUMP_HEIGHT = 0.08;
-    const MAX_JUMP_TIME = 30;
-    const MAX_HEIGHT = 2; // Maximum height limit
-    let jumpTimer = 0;
+    let winner = null;
+    let isSoundOn = true;
 
-    const gameAudio = document.getElementById('gameAudio');
-    gameAudio.volume = 0.5;
-    
-    const gameOverAudio = document.getElementById('gameOverAudio');
-    gameOverAudio.volume = 0.7;
+    // Audio elements
+    const backgroundMusic = new Audio('abc.mp3');
+    backgroundMusic.loop = true;
+    backgroundMusic.volume = 0.7;
+
+    const gameOverSound = new Audio('game-over.mp3');
+    gameOverSound.volume = 0.8;
+
+    // Audio controls
+    document.getElementById('audio-toggle').addEventListener('click', () => {
+      isSoundOn = !isSoundOn;
+      document.getElementById('audio-toggle').textContent = isSoundOn ? '🔊 Sound: ON' : '🔇 Sound: OFF';
+      
+      if (isSoundOn) {
+        if (!isGameOver) backgroundMusic.play();
+      } else {
+        backgroundMusic.pause();
+        gameOverSound.pause();
+      }
+    });
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xf8fafc);
 
-    // Create camera with a behind-the-ball view
-    const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 2, 5); // Position behind the player
-    camera.lookAt(0, 0, -5); // Looking ahead of the player
+    // Create camera with a wider view to show both players
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 3, 8); // Higher and further back position
+    camera.lookAt(0, 0, -5);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.shadowMap.enabled = true;
@@ -258,20 +319,6 @@
 
         if (this.zAcceleration) this.velocity.z += 0.0003;
 
-        // Handle height limit for player
-        if (this === player) {
-          if (this.position.y >= MAX_HEIGHT && this.velocity.y > 0) {
-            this.velocity.y = 0;
-            this.position.y = MAX_HEIGHT;
-          }
-          
-          // Start descent after reaching jump peak
-          if (isJumping && jumpTimer >= MAX_JUMP_TIME) {
-            this.velocity.y = -0.01; // Start descending
-            isJumping = false;
-          }
-        }
-
         this.position.x += this.velocity.x;
         this.position.z += this.velocity.z;
         this.position.y += this.velocity.y;
@@ -284,7 +331,7 @@
         }
 
         if (this.position.y < ground.position.y - 5) {
-          return true;
+          return true; // Fell off the world
         }
         return false;
       }
@@ -296,13 +343,6 @@
           const friction = 0.5;
           this.velocity.y *= friction;
           this.velocity.y = -this.velocity.y;
-          isJumping = false;
-          jumpTimer = 0;
-          
-          // Reset ability to jump when touching the ground
-          if (this === player) {
-            canJump = true;
-          }
         }
       }
     }
@@ -314,26 +354,82 @@
       return xCollision && yCollision && zCollision;
     }
 
-    function endGame() {
-      isGameOver = true;
-      document.getElementById('game-over').style.display = 'block';
-      document.getElementById('final-score').textContent = score;
-      gameAudio.pause();
-      gameAudio.currentTime = 0;
+    // Check for sphere to sphere collision (for player vs player)
+    function sphereCollision(sphere1, sphere2) {
+      const distance = Math.sqrt(
+        Math.pow(sphere1.position.x - sphere2.position.x, 2) +
+        Math.pow(sphere1.position.y - sphere2.position.y, 2) +
+        Math.pow(sphere1.position.z - sphere2.position.z, 2)
+      );
       
-      // Play game over sound
-      gameOverAudio.currentTime = 0;
-      gameOverAudio.play().catch(e => console.log("Game over audio play failed:", e));
+      return distance < (sphere1.width/2 + sphere2.width/2);
     }
 
-    const player = new GameObject({
+    function handlePlayerCollision() {
+      // Calculate direction vector between players
+      const dirX = player2.position.x - player1.position.x;
+      const dirZ = player2.position.z - player1.position.z;
+      
+      // Normalize the direction vector
+      const length = Math.sqrt(dirX * dirX + dirZ * dirZ);
+      const normDirX = dirX / length;
+      const normDirZ = dirZ / length;
+      
+      // Calculate relative velocity along the collision direction
+      const relVelX = player2.velocity.x - player1.velocity.x;
+      const relVelZ = player2.velocity.z - player1.velocity.z;
+      
+      // Calculate impulse
+      const impulse = 0.05; // Strength of the bounce
+      
+      // Apply impulse in the normalized direction to both players (in opposite directions)
+      player1.velocity.x -= normDirX * impulse;
+      player1.velocity.z -= normDirZ * impulse;
+      
+      player2.velocity.x += normDirX * impulse;
+      player2.velocity.z += normDirZ * impulse;
+    }
+
+    function endGame(winningPlayer) {
+      isGameOver = true;
+      winner = winningPlayer;
+      
+      // Play game over sound
+      if (isSoundOn) {
+        backgroundMusic.pause();
+        backgroundMusic.currentTime = 0;
+        gameOverSound.play();
+      }
+      
+      // Set appropriate winner text
+      document.getElementById('winner-text').textContent = 
+        winner === "player1" ? "PLAYER 1 WINS!" : "PLAYER 2 WINS!";
+      
+      document.getElementById('game-over').style.display = 'block';
+      document.getElementById('final-score').textContent = survivalTime.toFixed(1);
+    }
+
+    // Create player 1 (blue)
+    const player1 = new GameObject({
       radius: 0.5,
-      color: '#4a90e2',
+      color: '#4a90e2', // Blue
       velocity: { x: 0, y: -0.01, z: 0 },
+      position: { x: -2, y: 0, z: 0 }, // Start on left side
       isSphere: true
     });
-    player.castShadow = true;
-    scene.add(player);
+    player1.castShadow = true;
+    scene.add(player1);
+
+    // Create player 2 (red)
+    const player2 = new GameObject({
+      radius: 0.5,
+      color: '#ff6b6b', // Red
+      velocity: { x: 0, y: -0.01, z: 0 },
+      position: { x: 2, y: 0, z: 0 }, // Start on right side
+      isSphere: true
+    });
+    player2.castShadow = true;
+    scene.add(player2);
 
     const ground = new GameObject({
       width: 12,
@@ -357,18 +453,32 @@
     const ambientLight = new THREE.AmbientLight(0xf8fafc, 0.6);
     scene.add(ambientLight);
 
+    // Controls for both players (removed jump keys)
     const keys = {
+      // Player 1 controls (AD)
       a: { pressed: false },
       d: { pressed: false },
-      s: { pressed: false },
-      w: { pressed: false },
-      space: { pressed: false }
+      
+      // Player 2 controls (Arrow keys)
+      ArrowLeft: { pressed: false },
+      ArrowRight: { pressed: false }
     };
 
     // Function to start the game
     function startGame() {
       document.getElementById('start-overlay').style.display = 'none';
-      gameAudio.play().catch(e => console.log("Audio play failed:", e));
+      
+      // Play background music when game starts
+      if (isSoundOn) {
+        backgroundMusic.play().catch(error => {
+          console.log("Audio couldn't autoplay. User interaction needed.");
+          // We'll add a click event to start audio
+          document.addEventListener('click', () => {
+            if (!isGameOver && isSoundOn) backgroundMusic.play();
+          }, { once: true });
+        });
+      }
+      
       animate();
     }
 
@@ -376,31 +486,28 @@
     window.addEventListener('keydown', (event) => {
       if (document.getElementById('start-overlay').style.display !== 'none') {
         startGame();
+        return;
       }
 
-      if (!isGameOver && !gameAudio.playing) {
-        gameAudio.play().catch(e => console.log("Audio play failed:", e));
-      }
-
-      switch (event.code) {
-        case 'KeyA':
+      switch (event.key) {
+        // Player 1 controls
+        case 'a':
           keys.a.pressed = true;
           break;
-        case 'KeyD':
+        case 'd':
           keys.d.pressed = true;
           break;
-        
-        case 'Space':
-          keys.space.pressed = true;
-          // Only allow jump if canJump is true (haven't jumped yet or have touched ground since last jump)
-          if (canJump && !isGameOver && player.position.y < MAX_HEIGHT) {
-            isJumping = true;
-            canJump = false; // Prevent jumping again until touching ground
-            player.velocity.y = JUMP_HEIGHT;
-            jumpTimer = 0;
-          }
+          
+        // Player 2 controls
+        case 'ArrowLeft':
+          keys.ArrowLeft.pressed = true;
           break;
-        case 'KeyR':
+        case 'ArrowRight':
+          keys.ArrowRight.pressed = true;
+          break;
+          
+        // Restart game
+        case 'r':
           if (isGameOver) {
             restartGame();
           }
@@ -409,24 +516,21 @@
     });
 
     window.addEventListener('keyup', (event) => {
-      switch (event.code) {
-        case 'KeyA':
+      switch (event.key) {
+        // Player 1 controls
+        case 'a':
           keys.a.pressed = false;
           break;
-        case 'KeyD':
+        case 'd':
           keys.d.pressed = false;
           break;
-        
-        case 'Space':
-          keys.space.pressed = false;
-          // Force jump to end when space is released
-          if (isJumping) {
-            isJumping = false;
-            // Apply slight downward velocity to start descent
-            if (player.velocity.y > 0) {
-              player.velocity.y = -0.01;
-            }
-          }
+          
+        // Player 2 controls
+        case 'ArrowLeft':
+          keys.ArrowLeft.pressed = false;
+          break;
+        case 'ArrowRight':
+          keys.ArrowRight.pressed = false;
           break;
       }
     });
@@ -434,19 +538,23 @@
     function restartGame() {
       isGameOver = false;
       frames = 0;
-      spawnRate = 200;
-      score = 0;
-      isJumping = false;
-      canJump = true;
-      jumpTimer = 0;
+      spawnRate = 150;
+      survivalTime = 0;
+      winner = null;
       
       document.getElementById('game-over').style.display = 'none';
-      document.getElementById('score').textContent = 'Score - 0';
+      document.getElementById('score').textContent = 'Survivor Time: 0';
       
-      player.position.set(0, 0, 0);
-      player.velocity.x = 0;
-      player.velocity.y = -0.01;
-      player.velocity.z = 0;
+      // Reset player positions
+      player1.position.set(-2, 0, 0);
+      player1.velocity.x = 0;
+      player1.velocity.y = -0.01;
+      player1.velocity.z = 0;
+      
+      player2.position.set(2, 0, 0);
+      player2.velocity.x = 0;
+      player2.velocity.y = -0.01;
+      player2.velocity.z = 0;
       
       // Remove all enemies
       for (let enemy of enemies) {
@@ -454,8 +562,13 @@
       }
       enemies.length = 0;
       
-      gameAudio.currentTime = 0;
-      gameAudio.play().catch(e => console.log("Audio play failed:", e));
+      // Restart background music
+      if (isSoundOn) {
+        gameOverSound.pause();
+        gameOverSound.currentTime = 0;
+        backgroundMusic.currentTime = 0;
+        backgroundMusic.play();
+      }
       
       animate();
     }
@@ -466,56 +579,65 @@
 
       if (isGameOver) return;
 
-      // Score update
-      if (frames % 3 === 0) {
-        score += 1;
-        document.getElementById('score').textContent = `Score - ${score}`;
+      // Update survival time (in seconds)
+      if (frames % 60 === 0) {
+        survivalTime += 0.1;
+        document.getElementById('score').textContent = `Survivor Time: ${survivalTime.toFixed(1)}`;
       }
 
-      // Player movement with height limit
-      player.velocity.x = 0;
-      player.velocity.z = 0;
+      // Player 1 movement
+      player1.velocity.x = 0;
+      if (keys.a.pressed) player1.velocity.x = -0.05;
+      else if (keys.d.pressed) player1.velocity.x = 0.05;
       
-      if (keys.a.pressed) player.velocity.x = -0.05;
-      else if (keys.d.pressed) player.velocity.x = 0.05;
+      // Player 2 movement
+      player2.velocity.x = 0;
+      if (keys.ArrowLeft.pressed) player2.velocity.x = -0.05;
+      else if (keys.ArrowRight.pressed) player2.velocity.x = 0.05;
+
+      // Update camera to show both players
+      const centerX = (player1.position.x + player2.position.x) / 2;
+      const distance = Math.abs(player1.position.x - player2.position.x);
       
-      if (keys.s.pressed) player.velocity.z = 0.05;
-      else if (keys.w.pressed) {
-        player.velocity.z = -0.05;
+      // Adjust camera position based on players' distance
+      camera.position.x = centerX;
+      camera.position.z = 8 + distance * 0.5; // Move camera back as players spread apart
+      camera.lookAt(centerX, 0, -5);
+      
+      // Check for player-to-player collisions
+      if (sphereCollision(player1, player2)) {
+        handlePlayerCollision();
       }
 
-      // Update camera position to follow behind the player
-      camera.position.x = player.position.x;
-      camera.position.z = player.position.z + 5;
-      camera.lookAt(player.position.x, player.position.y, player.position.z - 5);
-      
-      // Jump timer logic - only increment if still jumping
-      if (isJumping) {
-        jumpTimer++;
-        // Force jump to end after MAX_JUMP_TIME
-        if (jumpTimer >= MAX_JUMP_TIME || player.position.y >= MAX_HEIGHT) {
-          isJumping = false;
-          // Apply slight downward velocity to start descent
-          player.velocity.y = -0.01;
-        }
-      }
-
-      // Check for game over
-      if (player.update(ground)) {
+      // Check for players falling off
+      if (player1.update(ground)) {
         cancelAnimationFrame(animationId);
-        endGame();
+        endGame("player2"); // Player 2 wins if Player 1 falls
         return;
       }
       
-      // Update and check enemies
+      if (player2.update(ground)) {
+        cancelAnimationFrame(animationId);
+        endGame("player1"); // Player 1 wins if Player 2 falls
+        return;
+      }
+      
+      // Update enemy positions and check collisions
       for (let i = enemies.length - 1; i >= 0; i--) {
         const enemy = enemies[i];
         enemy.update(ground);
         
-        // Check collision with player
-        if (boxCollision({ box1: player, box2: enemy })) {
+        // Check collision with player 1
+        if (boxCollision({ box1: player1, box2: enemy })) {
           cancelAnimationFrame(animationId);
-          endGame();
+          endGame("player2"); // Player 2 wins if Player 1 hits obstacle
+          return;
+        }
+        
+        // Check collision with player 2
+        if (boxCollision({ box1: player2, box2: enemy })) {
+          cancelAnimationFrame(animationId);
+          endGame("player1"); // Player 1 wins if Player 2 hits obstacle
           return;
         }
         
@@ -528,18 +650,21 @@
 
       // Spawn new enemies
       if (frames % spawnRate === 0) {
-        if (spawnRate > 20) spawnRate -= 10;
+        if (spawnRate > 20) spawnRate -= 5;
 
-        const colors = ['#ff6b6b', '#4a90e2', '#50c878', '#ffd700', '#ba68c8'];
+        const colors = ['#9c59b6', '#2ecc71', '#f39c12', '#1abc9c', '#e74c3c'];
         const randomColor = colors[Math.floor(Math.random() * colors.length)];
-        const speed = 0.005 + (score / 10000);
+        const speed = 0.005 + (survivalTime / 100);
 
+        // Random position across the width of the track
+        const xPosition = (Math.random() - 0.5) * 10;
+        
         const enemy = new GameObject({
           width: 1,
           height: 1,
           depth: 1,
           position: {
-            x: (Math.random() - 0.5) * 10,
+            x: xPosition,
             y: 0,
             z: -20
           },
@@ -559,18 +684,6 @@
 
       frames++;
     }
-
-    // Handle click for audio autoplay
-    document.addEventListener('click', () => {
-      if (!isGameOver && !gameAudio.playing) {
-        gameAudio.play().catch(e => console.log("Audio play failed:", e));
-      }
-    });
-
-    // Preload game over sound
-    window.addEventListener('load', () => {
-      gameOverAudio.load();
-    });
   </script>
 </body>
 </html>

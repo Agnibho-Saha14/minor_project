@@ -1,6 +1,6 @@
 # Survivor Sprint 🎮
 
-A thrilling 3D endless runner game built with Three.js where players must survive as long as possible while dodging incoming obstacles.
+A thrilling 3D competitive game built with Three.js where two players must survive as long as possible while dodging incoming obstacles. The last player standing wins!
 
 ## Project Information
 - **Course**: Minor Project (6th Semester)
@@ -17,25 +17,31 @@ A thrilling 3D endless runner game built with Three.js where players must surviv
 ## Features 🌟
 
 - Smooth 3D graphics powered by Three.js
+- Two-player competitive gameplay
 - Dynamic obstacle spawning with increasing difficulty
-- Score tracking system
-- Player controls with keyboard input
-- Physics-based movement including jumping and gravity
-- Background music
-- Responsive design
+- Survival time tracking
+- Player-to-player collisions with physics
+- Responsive camera that follows both players
+- Background music with toggle option
+- Modern UI with responsive design
 - Shadow and lighting effects
-- Game over screen with restart functionality
+- Game over screen with winner announcement and restart functionality
 
 ## Controls 🎮
-- **A**: Move left
-- **D**: Move right
+- **Player 1 (Blue)**:
+  - **A**: Move left
+  - **D**: Move right
+- **Player 2 (Red)**:
+  - **←**: Move left
+  - **→**: Move right
 - **R**: Restart game (when game over)
+- **Any key**: Start game (from start screen)
 
 ## Technical Features 💻
 
 ### Graphics and Rendering
 - Three.js for 3D rendering
-- Perspective camera with orbit controls
+- Perspective camera that dynamically adjusts to follow both players
 - Soft shadow mapping
 - Ambient and directional lighting
 - Grid helper for visual reference
@@ -43,17 +49,20 @@ A thrilling 3D endless runner game built with Three.js where players must surviv
 
 ### Game Mechanics
 - Object-oriented game object system
-- Collision detection
-- Dynamic difficulty scaling
-- Score system
+- Multiple collision detection systems (box-to-box and sphere-to-sphere)
+- Player-to-player collision physics
+- Dynamic difficulty scaling with increased obstacle speed over time
+- Survival time system
 - Gravity and physics simulation
 - Responsive window resizing
 
 ### UI Elements
-- Score display
-- Control instructions
-- Game over screen
-- Modern, minimalist design with blur effects
+- Survival time display
+- Player control instructions
+- Game start overlay
+- Sound toggle controls
+- Game over screen with winner announcement
+- Modern, minimalist design with blur effects and backdrop filters
 - Responsive layout
 
 ## Technologies Used 🛠️
@@ -67,31 +76,40 @@ A thrilling 3D endless runner game built with Three.js where players must surviv
 
 ## Game Objects
 
-### Player
-- Spherical character with physics-based movement
+### Players
+- Two spherical characters (Blue and Red) with physics-based movement
 - Shadow casting
-- Height-limited jumping mechanics
+- Collision detection between players
 - Smooth movement controls
 
 ### Obstacles
-- Randomly generated with varying positions
-- Increasing speed based on score
-- Different colors for visual variety
-- Physics-based movement
+- Randomly generated with varying positions and colors
+- Increasing speed based on survival time
+- Physics-based movement with acceleration
+- Collision detection with players
 
 ### Environment
 - Large ground plane with shadow receiving
 - Grid helper for spatial reference
 - Ambient and directional lighting
-- Responsive camera system
+- Responsive camera system that adjusts to keep both players in view
+
+## Game Rules
+
+1. Both players start on opposite sides of the track
+2. Control your player to avoid incoming obstacles
+3. Players can collide with each other, potentially pushing opponents into dangers
+4. The last player standing wins!
+5. A player is eliminated by:
+   - Falling off the track
+   - Colliding with an obstacle
 
 ## Performance Features ⚡
 
-- Efficient object pooling for obstacles
+- Efficient rendering with Three.js
 - Optimized collision detection
 - Hardware-accelerated rendering
 - Smooth animation frame handling
-
 
 ## Future Improvements 🔮
 
@@ -101,7 +119,7 @@ A thrilling 3D endless runner game built with Three.js where players must surviv
 - Mobile touch controls
 - Multiple difficulty levels
 - Visual effects and particles
-- Sound effects for actions
+- Additional sound effects for actions
 
 ## Credits 🙏
 
