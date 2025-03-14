@@ -105,9 +105,9 @@
       height: 100%;
       background: rgba(255, 255, 255, 0.98);
       display: flex;
-      flex-direction: column; 
-      justify-content: center; 
-      align-items: center; 
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
       z-index: 2000;
       backdrop-filter: blur(8px);
     }
@@ -122,20 +122,20 @@
     #start-overlay h2 {
       font-size: 1.5rem;
       color: #475569;
-      margin: 10px 0 0 0; 
+      margin: 10px 0 0 0;
     }
-    
+
     .player-info {
       margin-top: 5px;
       padding: 5px;
       border-radius: 8px;
     }
-    
+
     #player1-info {
       color: #4a90e2;
       font-weight: bold;
     }
-    
+
     #player2-info {
       color: #ff6b6b;
       font-weight: bold;
@@ -172,7 +172,7 @@
       transform: translateY(-1px);
       box-shadow: 0 4px 6px rgba(148, 163, 184, 0.15);
     }
-    
+
     /* Countdown styles */
     #countdown-overlay {
       position: fixed;
@@ -188,7 +188,7 @@
       backdrop-filter: blur(5px);
       display: none;
     }
-    
+
     #countdown {
       font-size: 10rem;
       font-weight: bold;
@@ -196,7 +196,7 @@
       text-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
       animation: pulse 1s infinite;
     }
-    
+
     @keyframes pulse {
       0% { transform: scale(1); }
       50% { transform: scale(1.1); }
@@ -272,25 +272,32 @@
 
     const gameOverSound = new Audio('game-over.mp3');
     gameOverSound.volume = 0.8;
-    
+
     // Countdown sound
     const countdownSound = new Audio('countdown.mp3');
     countdownSound.volume = 0.7;
-    
-    
+
+    // Go sound
+    const goSound = new Audio('go.mp3');
+    goSound.volume = 0.7;
+
+    // Collision sound
+    const collisionSound = new Audio('collision.mp3');
+    collisionSound.volume = 0.5;
 
     // Audio controls
     document.getElementById('audio-toggle').addEventListener('click', () => {
       isSoundOn = !isSoundOn;
       document.getElementById('audio-toggle').textContent = isSoundOn ? '🔊 Sound: ON' : '🔇 Sound: OFF';
-      
+
       if (isSoundOn) {
         if (!isGameOver && !isCountingDown) backgroundMusic.play();
       } else {
         backgroundMusic.pause();
         gameOverSound.pause();
         countdownSound.pause();
-        
+        goSound.pause();
+        collisionSound.pause();
       }
     });
 
@@ -326,22 +333,24 @@
         zAcceleration = false,
         isSphere = false
       }) {
-        const geometry = isSphere 
+        const geometry = isSphere
           ? new THREE.SphereGeometry(radius, 32, 32)
           : new THREE.BoxGeometry(width, height, depth);
-        
-        const material = new THREE.MeshStandardMaterial({ 
+
+        const material = new THREE.MeshStandardMaterial({
           color,
           metalness: 0.3,
           roughness: 0.7
         });
-        
+
         super(geometry, material);
 
         this.width = isSphere ? radius * 2 : width;
         this.height = isSphere ? radius * 2 : height;
         this.depth = isSphere ? radius * 2 : depth;
         this.isSphere = isSphere;
+        this.radius = isSphere ? radius : null;
+        this.mass = 1; // Default mass for physics calculations
 
         this.position.set(position.x, position.y, position.z);
         this.updateSides();
@@ -369,12 +378,14 @@
         this.position.y += this.velocity.y;
 
         this.applyGravity(ground);
-        
+
         if (this.isSphere) {
+          // Apply rotation based on movement for rolling effect
           this.rotation.x += this.velocity.z * 0.5;
           this.rotation.z -= this.velocity.x * 0.5;
         }
 
+        // Check if object fell off the world
         if (this.position.y < ground.position.y - 5) {
           return true; // Fell off the world
         }
@@ -406,50 +417,74 @@
         Math.pow(sphere1.position.y - sphere2.position.y, 2) +
         Math.pow(sphere1.position.z - sphere2.position.z, 2)
       );
-      
+
       return distance < (sphere1.width/2 + sphere2.width/2);
     }
 
+    // Improved ball collision handling with realistic physics
     function handlePlayerCollision() {
-      // Calculate direction vector between players
-      const dirX = player2.position.x - player1.position.x;
-      const dirZ = player2.position.z - player1.position.z;
-      
-      // Normalize the direction vector
-      const length = Math.sqrt(dirX * dirX + dirZ * dirZ);
-      const normDirX = dirX / length;
-      const normDirZ = dirZ / length;
-      
-      // Calculate relative velocity along the collision direction
-      const relVelX = player2.velocity.x - player1.velocity.x;
-      const relVelZ = player2.velocity.z - player1.velocity.z;
-      
-      // Calculate impulse
-      const impulse = 0.05; // Strength of the bounce
-      
-      // Apply impulse in the normalized direction to both players (in opposite directions)
-      player1.velocity.x -= normDirX * impulse;
-      player1.velocity.z -= normDirZ * impulse;
-      
-      player2.velocity.x += normDirX * impulse;
-      player2.velocity.z += normDirZ * impulse;
-    }
+  const dx = player2.position.x - player1.position.x;
+  const dz = player2.position.z - player1.position.z;
+  const distance = Math.sqrt(dx * dx + dz * dz);
+  const minDistance = 1.0;
+
+  if (distance < minDistance) {
+    // Calculate pure horizontal collision angle
+    const angle = Math.atan2(dz, dx);
+    
+    // Strong positional shove
+    const separationForce = 2.5;
+    const moveX = Math.cos(angle) * separationForce;
+    const moveZ = Math.sin(angle) * separationForce;
+
+    // Immediate positional separation
+    player1.position.x -= moveX;
+    player1.position.z -= moveZ;
+    player2.position.x += moveX;
+    player2.position.z += moveZ;
+
+    // Violent velocity exchange
+    const velocityTransfer = 1.0; // Full momentum transfer
+    const horizontalBoost = 0.3; // Knockout boost
+    
+    // Swap and boost velocities
+    const p1vx = player1.velocity.x;
+    const p1vz = player1.velocity.z;
+    
+    player1.velocity.x = (player2.velocity.x * velocityTransfer) + (Math.cos(angle) * horizontalBoost);
+    player1.velocity.z = (player2.velocity.z * velocityTransfer) + (Math.sin(angle) * horizontalBoost);
+    
+    player2.velocity.x = (p1vx * velocityTransfer) - (Math.cos(angle) * horizontalBoost);
+    player2.velocity.z = (p1vz * velocityTransfer) - (Math.sin(angle) * horizontalBoost);
+
+    // Remove vertical movement completely
+    player1.velocity.y = 0;
+    player2.velocity.y = 0;
+
+    // Allow higher speeds for knockouts
+    const maxSpeed = 0.5;
+    player1.velocity.x = Math.clamp(player1.velocity.x, -maxSpeed, maxSpeed);
+    player1.velocity.z = Math.clamp(player1.velocity.z, -maxSpeed, maxSpeed);
+    player2.velocity.x = Math.clamp(player2.velocity.x, -maxSpeed, maxSpeed);
+    player2.velocity.z = Math.clamp(player2.velocity.z, -maxSpeed, maxSpeed);
+  }
+}
 
     function endGame(winningPlayer) {
       isGameOver = true;
       winner = winningPlayer;
-      
+
       // Play game over sound
       if (isSoundOn) {
         backgroundMusic.pause();
         backgroundMusic.currentTime = 0;
         gameOverSound.play();
       }
-      
+
       // Set appropriate winner text
-      document.getElementById('winner-text').textContent = 
+      document.getElementById('winner-text').textContent =
         winner === "player1" ? "PLAYER 1 WINS!" : "PLAYER 2 WINS!";
-      
+
       document.getElementById('game-over').style.display = 'block';
       document.getElementById('final-score').textContent = survivalTime.toFixed(1);
     }
@@ -503,7 +538,7 @@
       // Player 1 controls (AD)
       a: { pressed: false },
       d: { pressed: false },
-      
+
       // Player 2 controls (Arrow keys)
       ArrowLeft: { pressed: false },
       ArrowRight: { pressed: false }
@@ -514,15 +549,15 @@
       document.getElementById('start-overlay').style.display = 'none';
       document.getElementById('countdown-overlay').style.display = 'flex';
       isCountingDown = true;
-      
+
       countdownValue = 3;
       document.getElementById('countdown').textContent = countdownValue;
-      
+
       if (isSoundOn) countdownSound.play();
-      
+
       const countdownInterval = setInterval(() => {
         countdownValue--;
-        
+
         if (countdownValue > 0) {
           document.getElementById('countdown').textContent = countdownValue;
           if (isSoundOn) countdownSound.play();
@@ -550,7 +585,7 @@
           }, { once: true });
         });
       }
-      
+
       animate();
     }
 
@@ -569,7 +604,7 @@
         case 'd':
           keys.d.pressed = true;
           break;
-          
+
         // Player 2 controls
         case 'ArrowLeft':
           keys.ArrowLeft.pressed = true;
@@ -577,7 +612,7 @@
         case 'ArrowRight':
           keys.ArrowRight.pressed = true;
           break;
-          
+
         // Restart game
         case 'r':
           if (isGameOver) {
@@ -596,7 +631,7 @@
         case 'd':
           keys.d.pressed = false;
           break;
-          
+
         // Player 2 controls
         case 'ArrowLeft':
           keys.ArrowLeft.pressed = false;
@@ -613,27 +648,27 @@
       spawnRate = 150;
       survivalTime = 0;
       winner = null;
-      
+
       document.getElementById('game-over').style.display = 'none';
       document.getElementById('score').textContent = 'Survivor Time: 0';
-      
+
       // Reset player positions
       player1.position.set(-2, 0, 0);
       player1.velocity.x = 0;
       player1.velocity.y = -0.01;
       player1.velocity.z = 0;
-      
+
       player2.position.set(2, 0, 0);
       player2.velocity.x = 0;
       player2.velocity.y = -0.01;
       player2.velocity.z = 0;
-      
+
       // Remove all enemies
       for (let enemy of enemies) {
         scene.remove(enemy);
       }
       enemies.length = 0;
-      
+
       // Start with countdown
       startCountdown();
     }
@@ -654,7 +689,7 @@
       player1.velocity.x = 0;
       if (keys.a.pressed) player1.velocity.x = -0.05;
       else if (keys.d.pressed) player1.velocity.x = 0.05;
-      
+
       // Player 2 movement
       player2.velocity.x = 0;
       if (keys.ArrowLeft.pressed) player2.velocity.x = -0.05;
@@ -663,12 +698,12 @@
       // Update camera to show both players
       const centerX = (player1.position.x + player2.position.x) / 2;
       const distance = Math.abs(player1.position.x - player2.position.x);
-      
+
       // Adjust camera position based on players' distance
       camera.position.x = centerX;
       camera.position.z = 8 + distance * 0.5; // Move camera back as players spread apart
       camera.lookAt(centerX, 0, -5);
-      
+
       // Check for player-to-player collisions
       if (sphereCollision(player1, player2)) {
         handlePlayerCollision();
@@ -680,32 +715,45 @@
         endGame("player2"); // Player 2 wins if Player 1 falls
         return;
       }
-      
+
       if (player2.update(ground)) {
         cancelAnimationFrame(animationId);
         endGame("player1"); // Player 1 wins if Player 2 falls
         return;
       }
-      
+
+      // Apply friction to player velocities
+      if (Math.abs(player1.velocity.x) > 0.001) {
+        player1.velocity.x *= 0.98;
+      } else {
+        player1.velocity.x = 0;
+      }
+
+      if (Math.abs(player2.velocity.x) > 0.001) {
+        player2.velocity.x *= 0.98;
+      } else {
+        player2.velocity.x = 0;
+      }
+
       // Update enemy positions and check collisions
       for (let i = enemies.length - 1; i >= 0; i--) {
         const enemy = enemies[i];
         enemy.update(ground);
-        
+
         // Check collision with player 1
         if (boxCollision({ box1: player1, box2: enemy })) {
           cancelAnimationFrame(animationId);
           endGame("player2"); // Player 2 wins if Player 1 hits obstacle
           return;
         }
-        
+
         // Check collision with player 2
         if (boxCollision({ box1: player2, box2: enemy })) {
           cancelAnimationFrame(animationId);
           endGame("player1"); // Player 1 wins if Player 2 hits obstacle
           return;
         }
-        
+
         // Remove enemies that have gone too far
         if (enemy.position.z > 20) {
           scene.remove(enemy);
@@ -723,7 +771,7 @@
 
         // Random position across the width of the track
         const xPosition = (Math.random() - 0.5) * 10;
-        
+
         const enemy = new GameObject({
           width: 1,
           height: 1,
